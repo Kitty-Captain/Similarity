@@ -1,27 +1,40 @@
 import express from 'express';
 import { createServer } from 'http';
+import path from 'path';
 import { Server, ServerOptions } from 'socket.io';
-import { config } from 'dotenv';
+import dotenv from 'dotenv';
 import ShortId from 'shortid';
 import JSONdb from 'simple-json-db';
 
 import { events } from '../common/events';
 import { TRoom, TUser} from './types';
 
-config();
+const isProd = process.env.NODE_ENV === 'production';
 
+if (!isProd) {
+    dotenv.config({ path: '../.env'});
+}
+
+const port = process.env.PORT || 5000;
 const app = express();
+
+
+app.use(express.static(path.join(__dirname, 'client')));
+app.get('/', async (req, res) => {
+    res.render('index');
+});
+
 const httpServer = createServer(app);
-const ioConfig: Partial<ServerOptions> = {
-    cors: {
+const ioConfig: Partial<ServerOptions> = {};
+
+if (!isProd) {
+    ioConfig.cors = {
         origin: `http://localhost:${process.env.CLIENT_PORT}`,
         methods: ['GET', 'POST'],
-    },
-};
+    };
+}
 const io = new Server(httpServer, ioConfig);
 const db = new JSONdb('db.json');
-
-app.use(express.static(__dirname + '/public'));
 
 const getUser = (id: string): TUser => db.get(id);
 const setUser = (id: string, data: TUser) => db.set(id, data);
@@ -150,6 +163,6 @@ io.on('connection', client => {
     });
 });
 
-httpServer.listen(process.env.SERVER_PORT);
-
-console.log('Listening on port:', process.env.SERVER_PORT)
+httpServer.listen(port, () => {
+    console.log('Listening on port:', port);
+});
